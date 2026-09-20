@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inspectEnv, parseEnv, runCli } from "../src/index.js";
+import { formatGitHubReport, inspectEnv, parseEnv, runCli } from "../src/index.js";
 
 test("parses comments, export syntax, quotes, and duplicates", () => {
   const result = parseEnv("# hi\nexport API_URL='https://example.test'\nPORT=3000 # local\nPORT=4000\n");
@@ -74,4 +74,24 @@ test("CLI rejects reading both inputs from stdin", async () => {
     runCli(["--env", "-", "--example", "-"], { readStdin: async () => "A=1" }),
     /Only one input/
   );
+});
+
+test("formats GitHub Actions annotations without exposing values", () => {
+  const output = formatGitHubReport(inspectEnv("EXTRA=do-not-print", "TOKEN=live-secret"));
+  assert.match(output, /::error title=Missing from \.env::TOKEN/);
+  assert.match(output, /::warning title=Extra in \.env::EXTRA/);
+  assert.match(output, /::error title=Possible secret in example::TOKEN/);
+  assert.equal(output.includes("do-not-print"), false);
+  assert.equal(output.includes("live-secret"), false);
+});
+
+test("CLI offers mutually exclusive GitHub annotation output", async () => {
+  let output = "";
+  const code = await runCli(["--github"], {
+    readFile: async () => "A=1",
+    write: (value) => { output = value; }
+  });
+  assert.equal(code, 0);
+  assert.equal(output, "::notice title=env-guard::Environment contract is valid");
+  await assert.rejects(runCli(["--github", "--json"]), /either --json or --github/);
 });

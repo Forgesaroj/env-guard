@@ -68,8 +68,31 @@ export function formatReport(report) {
   return lines.join("\n");
 }
 
+export function formatGitHubReport(report) {
+  const lines = [];
+  annotate(lines, "error", "Missing from .env", report.missing);
+  annotate(lines, report.strict ? "error" : "warning", "Extra in .env", report.extra);
+  annotate(lines, "notice", "Ignored extra in .env", report.ignoredExtra);
+  annotate(lines, "error", "Duplicate in .env", report.duplicates.env);
+  annotate(lines, "error", "Duplicate in example", report.duplicates.example);
+  annotate(lines, "error", "Possible secret in example", report.suspiciousExamples);
+  if (!lines.length) lines.push("::notice title=env-guard::Environment contract is valid");
+  return lines.join("\n");
+}
+
 function add(lines, title, values, suffix = "") {
   if (values.length) lines.push(`${title}${suffix}: ${values.join(", ")}`);
+}
+
+function annotate(lines, level, title, values) {
+  for (const value of values) {
+    lines.push(`::${level} title=${escapeAnnotation(title, true)}::${escapeAnnotation(value)}`);
+  }
+}
+
+function escapeAnnotation(value, property = false) {
+  const escaped = String(value).replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+  return property ? escaped.replaceAll(":", "%3A").replaceAll(",", "%2C") : escaped;
 }
 
 export async function runCli(argv, io = {}) {
@@ -83,7 +106,12 @@ export async function runCli(argv, io = {}) {
   const readInput = (path) => path === "-" ? readStdin() : read(path);
   const [actual, example] = await Promise.all([readInput(args.env), readInput(args.example)]);
   const report = inspectEnv(actual, example, { strict: args.strict, ignoreExtra: args.ignoreExtra });
-  write(args.json ? JSON.stringify(report, null, 2) : formatReport(report));
+  const output = args.json
+    ? JSON.stringify(report, null, 2)
+    : args.github
+      ? formatGitHubReport(report)
+      : formatReport(report);
+  write(output);
   return report.ok ? 0 : 1;
 }
 
@@ -95,16 +123,18 @@ async function readStandardInput() {
 }
 
 function parseArgs(argv) {
-  const result = { env: ".env", example: ".env.example", strict: false, json: false, ignoreExtra: [] };
+  const result = { env: ".env", example: ".env.example", strict: false, json: false, github: false, ignoreExtra: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--env") result.env = required(argv[++i], "--env");
     else if (arg === "--example") result.example = required(argv[++i], "--example");
     else if (arg === "--strict") result.strict = true;
     else if (arg === "--json") result.json = true;
+    else if (arg === "--github") result.github = true;
     else if (arg === "--ignore-extra") result.ignoreExtra.push(required(argv[++i], "--ignore-extra"));
     else throw new Error(`Unknown option: ${arg}`);
   }
+  if (result.json && result.github) throw new Error("Choose either --json or --github");
   return result;
 }
 

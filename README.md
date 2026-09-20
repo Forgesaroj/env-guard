@@ -9,6 +9,7 @@ Catch environment-file drift before deployment—without printing secret values.
 ```bash
 npx @forgesaroj/env-guard
 npx @forgesaroj/env-guard --strict --json
+npx @forgesaroj/env-guard --strict --github
 npx @forgesaroj/env-guard --env .env.production --example .env.example
 npx print-env | npx @forgesaroj/env-guard --env - --example .env.example
 npx @forgesaroj/env-guard --strict --ignore-extra CI --ignore-extra 'VERCEL_*'
@@ -20,11 +21,13 @@ Use repeatable `--ignore-extra` options for known platform-managed keys. A patte
 
 Pass `-` to either `--env` or `--example` to read that input from standard input. Only one input may use standard input at a time, which makes generated or secret-managed environments easy to validate without writing them to disk.
 
+Use `--github` in GitHub Actions to emit native error, warning, and notice annotations. It is mutually exclusive with `--json`, and annotations contain key names only—never environment values.
+
 ## CI example
 
 ```yaml
 - name: Check environment contract
-  run: npx @forgesaroj/env-guard --strict
+  run: npx @forgesaroj/env-guard --strict --github
 ```
 
 ## What it checks
