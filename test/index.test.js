@@ -20,6 +20,17 @@ test("strict mode fails on extra keys", () => {
   assert.equal(inspectEnv("A=1\nB=2", "A=", { strict: true }).ok, false);
 });
 
+test("strict mode can ignore exact and prefix-matched platform keys", () => {
+  const report = inspectEnv("APP=1\nCI=true\nVERCEL_ENV=production\nUNEXPECTED=x", "APP=", {
+    strict: true,
+    ignoreExtra: ["CI", "VERCEL_*"]
+  });
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.ignoredExtra, ["CI", "VERCEL_ENV"]);
+  assert.deepEqual(report.extra, ["UNEXPECTED"]);
+  assert.throws(() => inspectEnv("A=1", "", { ignoreExtra: ["BAD*PATTERN"] }), /Invalid ignore pattern/);
+});
+
 test("flags likely secrets committed to the example", () => {
   assert.deepEqual(inspectEnv("API_TOKEN=x", "API_TOKEN=live-secret-value").suspiciousExamples, ["API_TOKEN"]);
 });
@@ -32,4 +43,14 @@ test("CLI supports injected IO and JSON output", async () => {
   });
   assert.equal(code, 0);
   assert.equal(JSON.parse(output).ok, true);
+});
+
+test("CLI accepts repeatable ignore patterns", async () => {
+  let output = "";
+  const code = await runCli(["--strict", "--json", "--ignore-extra", "CI", "--ignore-extra", "VERCEL_*"], {
+    readFile: async (path) => path === ".env" ? "APP=1\nCI=true\nVERCEL_ENV=preview" : "APP=",
+    write: (value) => { output = value; }
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(JSON.parse(output).ignoredExtra, ["CI", "VERCEL_ENV"]);
 });
