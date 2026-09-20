@@ -1,3 +1,40 @@
 # env-guard
 
-Zero-dependency environment contract checker. Initial project setup is tracked in the first implementation issue.
+Catch environment-file drift before deployment—without printing secret values.
+
+`env-guard` compares a local `.env` with `.env.example` and reports missing keys, unexpected keys, duplicates, and likely real secrets accidentally placed in the example file. It has no runtime dependencies.
+
+## Quick start
+
+```bash
+npx @forgesaroj/env-guard
+npx @forgesaroj/env-guard --strict --json
+npx @forgesaroj/env-guard --env .env.production --example .env.example
+```
+
+Exit codes are `0` for a clean check, `1` for validation problems, and `2` for usage or file errors. Extra variables are warnings unless `--strict` is used. Values are never included in reports.
+
+## CI example
+
+```yaml
+- name: Check environment contract
+  run: npx @forgesaroj/env-guard --strict
+```
+
+## What it checks
+
+- keys present in the example but missing from the real environment;
+- keys present only in the real environment;
+- repeated definitions in either file;
+- secret-looking keys with non-placeholder values in `.env.example`.
+
+This is a guardrail, not a full secret scanner. Pair it with your platform's secret management and repository scanning.
+
+## Development
+
+```bash
+npm test
+npm run check
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. MIT licensed.
