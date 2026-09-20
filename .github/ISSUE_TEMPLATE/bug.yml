@@ -1,0 +1,14 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    attributes: { label: What happened?, description: Never include real environment values. }
+    validations: { required: true }
+  - type: textarea
+    attributes: { label: Minimal redacted example }
+    validations: { required: true }
+  - type: input
+    attributes: { label: Node and env-guard versions }
+    validations: { required: true }

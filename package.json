@@ -1,0 +1,16 @@
+{
+  "name": "@forgesaroj/env-guard",
+  "version": "0.1.0",
+  "description": "Zero-dependency CLI that checks .env files without printing secret values.",
+  "type": "module",
+  "bin": { "env-guard": "./bin/env-guard.js" },
+  "exports": "./src/index.js",
+  "files": ["bin", "src"],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/index.js && node --check bin/env-guard.js"
+  },
+  "engines": { "node": ">=20" },
+  "keywords": ["dotenv", "environment", "cli", "security", "ci"],
+  "license": "MIT"
+}
