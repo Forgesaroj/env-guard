@@ -10,9 +10,12 @@ Catch environment-file drift before deployment—without printing secret values.
 npx @forgesaroj/env-guard
 npx @forgesaroj/env-guard --strict --json
 npx @forgesaroj/env-guard --env .env.production --example .env.example
+npx @forgesaroj/env-guard --strict --ignore-extra CI --ignore-extra 'VERCEL_*'
 ```
 
 Exit codes are `0` for a clean check, `1` for validation problems, and `2` for usage or file errors. Extra variables are warnings unless `--strict` is used. Values are never included in reports.
+
+Use repeatable `--ignore-extra` options for known platform-managed keys. A pattern may be an exact key such as `CI` or a trailing-wildcard prefix such as `VERCEL_*`; ignored keys remain visible in the report for auditability.
 
 ## CI example
 

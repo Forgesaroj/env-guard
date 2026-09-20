@@ -28,13 +28,15 @@ function unquote(value) {
   return value.replace(/\s+#.*$/, "").trim();
 }
 
-export function inspectEnv(actualText, exampleText, { strict = false } = {}) {
+export function inspectEnv(actualText, exampleText, { strict = false, ignoreExtra = [] } = {}) {
   const actual = parseEnv(actualText);
   const example = parseEnv(exampleText);
   const actualKeys = new Set(actual.entries.keys());
   const exampleKeys = new Set(example.entries.keys());
   const missing = [...exampleKeys].filter((key) => !actualKeys.has(key)).sort();
-  const extra = [...actualKeys].filter((key) => !exampleKeys.has(key)).sort();
+  const extraKeys = [...actualKeys].filter((key) => !exampleKeys.has(key));
+  const ignoredExtra = extraKeys.filter((key) => ignoreExtra.some((pattern) => matchesPattern(key, pattern))).sort();
+  const extra = extraKeys.filter((key) => !ignoredExtra.includes(key)).sort();
   const suspiciousExamples = [...example.entries]
     .filter(([key, value]) => SECRET_KEY.test(key) && value && !PLACEHOLDER.test(value))
     .map(([key]) => key)
@@ -47,6 +49,7 @@ export function inspectEnv(actualText, exampleText, { strict = false } = {}) {
     strict,
     missing,
     extra,
+    ignoredExtra,
     duplicates: { env: actual.duplicates, example: example.duplicates },
     suspiciousExamples,
     counts: { env: actualKeys.size, example: exampleKeys.size }
@@ -57,6 +60,7 @@ export function formatReport(report) {
   const lines = [report.ok ? "env-guard: OK" : "env-guard: problems found"];
   add(lines, "Missing from .env", report.missing);
   add(lines, "Extra in .env", report.extra, !report.strict ? " (warning)" : "");
+  add(lines, "Ignored extra in .env", report.ignoredExtra);
   add(lines, "Duplicate in .env", report.duplicates.env);
   add(lines, "Duplicate in example", report.duplicates.example);
   add(lines, "Possible secret in example", report.suspiciousExamples);
@@ -73,22 +77,30 @@ export async function runCli(argv, io = {}) {
   const read = io.readFile ?? ((path) => readFile(path, "utf8"));
   const write = io.write ?? ((value) => process.stdout.write(`${value}\n`));
   const [actual, example] = await Promise.all([read(args.env), read(args.example)]);
-  const report = inspectEnv(actual, example, { strict: args.strict });
+  const report = inspectEnv(actual, example, { strict: args.strict, ignoreExtra: args.ignoreExtra });
   write(args.json ? JSON.stringify(report, null, 2) : formatReport(report));
   return report.ok ? 0 : 1;
 }
 
 function parseArgs(argv) {
-  const result = { env: ".env", example: ".env.example", strict: false, json: false };
+  const result = { env: ".env", example: ".env.example", strict: false, json: false, ignoreExtra: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--env") result.env = required(argv[++i], "--env");
     else if (arg === "--example") result.example = required(argv[++i], "--example");
     else if (arg === "--strict") result.strict = true;
     else if (arg === "--json") result.json = true;
+    else if (arg === "--ignore-extra") result.ignoreExtra.push(required(argv[++i], "--ignore-extra"));
     else throw new Error(`Unknown option: ${arg}`);
   }
   return result;
+}
+
+function matchesPattern(key, pattern) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*\*?$/.test(pattern)) {
+    throw new TypeError(`Invalid ignore pattern: ${pattern}`);
+  }
+  return pattern.endsWith("*") ? key.startsWith(pattern.slice(0, -1)) : key === pattern;
 }
 
 function required(value, option) {
