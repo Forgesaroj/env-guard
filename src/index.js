@@ -75,11 +75,23 @@ function add(lines, title, values, suffix = "") {
 export async function runCli(argv, io = {}) {
   const args = parseArgs(argv);
   const read = io.readFile ?? ((path) => readFile(path, "utf8"));
+  const readStdin = io.readStdin ?? readStandardInput;
   const write = io.write ?? ((value) => process.stdout.write(`${value}\n`));
-  const [actual, example] = await Promise.all([read(args.env), read(args.example)]);
+  if (args.env === "-" && args.example === "-") {
+    throw new Error("Only one input may be read from stdin");
+  }
+  const readInput = (path) => path === "-" ? readStdin() : read(path);
+  const [actual, example] = await Promise.all([readInput(args.env), readInput(args.example)]);
   const report = inspectEnv(actual, example, { strict: args.strict, ignoreExtra: args.ignoreExtra });
   write(args.json ? JSON.stringify(report, null, 2) : formatReport(report));
   return report.ok ? 0 : 1;
+}
+
+async function readStandardInput() {
+  process.stdin.setEncoding("utf8");
+  let text = "";
+  for await (const chunk of process.stdin) text += chunk;
+  return text;
 }
 
 function parseArgs(argv) {

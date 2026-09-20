@@ -54,3 +54,24 @@ test("CLI accepts repeatable ignore patterns", async () => {
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(output).ignoredExtra, ["CI", "VERCEL_ENV"]);
 });
+
+test("CLI can read either environment contract input from stdin", async () => {
+  const outputs = [];
+  const io = {
+    readFile: async (path) => path.endsWith("example") ? "A=" : "A=1",
+    readStdin: async () => "A=1",
+    write: (value) => outputs.push(value)
+  };
+
+  assert.equal(await runCli(["--env", "-"], io), 0);
+  io.readStdin = async () => "A=";
+  assert.equal(await runCli(["--example", "-"], io), 0);
+  assert.equal(outputs.length, 2);
+});
+
+test("CLI rejects reading both inputs from stdin", async () => {
+  await assert.rejects(
+    runCli(["--env", "-", "--example", "-"], { readStdin: async () => "A=1" }),
+    /Only one input/
+  );
+});
